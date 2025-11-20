@@ -1,0 +1,27 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { z } from 'zod';
+
+// Set the NODE_ENV to 'development' if it's not already set
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+
+const envFile = `.env.${process.env.NODE_ENV}`;
+const envPath = path.resolve(process.cwd(), envFile);
+
+dotenv.config({ path: envPath });
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production']),
+  PORT: z.string().default('3000'),
+  MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
+  JWT_SECRET_ADMIN: z.string().min(1, 'JWT_SECRET_ADMIN is required'),
+  JWT_SECRET_USER: z.string().min(1, 'JWT_SECRET_USER is required'),
+  SGCHAIN_RPC_URL: z.string().optional(),
+  SGCHAIN_HOT_WALLET_PRIVATE_KEY: z.string().optional(),
+  TEST_SGC_TARGET_ADDRESS: z.string().optional(),
+  SGC_WALLET_ENCRYPTION_KEY: z.string().length(64, 'Must be a 32-byte hex key'),
+  // Sagenex to SGChain Transfers
+  SGC_TRANSFER_JWT_SECRET: z.string().min(1),
+  SAGENEX_INTERNAL_SECRET: z.string().min(1),
+});
+export const env = envSchema.parse(process.env);

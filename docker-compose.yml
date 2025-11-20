@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/sgchain
+    env_file:
+      - .env.production
+    depends_on:
+      - mongo
+    networks:
+      - sgcnet
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27019:27019"
+    command: mongod --replSet rs0 --port 27019 --bind_ip_all
+
+networks:
+  sgcnet:
+    driver: bridge
+
+volumes:
+  mongo-data:
