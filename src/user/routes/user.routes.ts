@@ -47,6 +47,10 @@ router.get('/me/withdrawals', authUser, withdrawalController.getWithdrawalHistor
 router.post('/me/transfer/sgc', authUser, transferController.internalTransfer);
 router.get('/me/transfers/sgc', authUser, transferController.getTransferHistory);
 
+// External Transfers (SGTrading)
+router.post('/me/transfer/external', authUser, transferController.initiateExternalTransfer);
+router.get('/me/transfers/external', authUser, transferController.getExternalTransferHistory);
+
 // Transaction History
 router.get('/me/history', authUser, ledgerController.getHistory);
 

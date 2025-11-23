@@ -1,0 +1,360 @@
+📄 DOC 1 – SGCHAIN BACKEND TEAM
+
+Title: SGChain Token Creation Backend – FunCoin & SuperCoin (v1)
+
+1. Scope
+
+This backend service is responsible for:
+
+Managing off-chain configuration & metadata for user-created tokens.
+
+Handling one-click token creation flows from the SGChain website.
+
+Orchestrating calls to the SGChain Blockchain token factory.
+
+Storing all tokenomics, release schedules, and vesting configs.
+
+Exposing internal APIs for frontend and public read-only APIs later.
+
+It does not run the blockchain itself – it talks to SGChain (EVM/Ethermint) via an internal sgchainClient.
+
+2. Token Variants & Concepts
+2.1 Variants
+
+FunCoin (Tier: FUN)
+
+Free (no platform fee).
+
+“Just for fun / team / flex / identity”.
+
+Limited tokenomics & release options (configurable).
+
+May or may not support advanced vesting (we keep the fields ready).
+
+SuperCoin (Tier: SUPER)
+
+Serious tokens (leaders, large teams, businesses).
+
+Full tokenomics + vesting customisation.
+
+Required to be deployed via verified token factory on SGChain.
+
+Extra metadata (website, socials, docs, etc.).
+
+2.2 High-Level Flow
+
+User chooses token tier (FunCoin / SuperCoin).
+
+User fills out token metadata + tokenomics + release schedule.
+
+Backend stores everything as a TokenDraft / TokenLaunch.
+
+When user clicks “Create Coin”, backend:
+
+Validates config.
+
+Calls Blockchain Team’s TokenFactory via sgchainClient.
+
+Waits for tx confirmation / async worker updates status.
+
+Backend stores on-chain token address and exposes it in APIs.
+
+3. Data Model (DB-Level)
+
+Assume MongoDB / SQL – structure is conceptual.
+
+3.1 TokenLaunch (main entity)
+TokenLaunch {
+  _id: string;                     // UUID or ObjectId
+  tier: 'FUN' | 'SUPER';
+
+  // Ownership / identity
+  creatorUserId: string;           // Internal user id
+  creatorWalletAddress: string;    // SGChain EVM address
+  createdAt: Date;
+  updatedAt: Date;
+
+  // Lifecycle
+  status: 'DRAFT' 
+        | 'PENDING_ONCHAIN' 
+        | 'DEPLOYED' 
+        | 'FAILED' 
+        | 'REJECTED';              // For SUPER if you add review step later
+
+  // On-chain info
+  tokenAddress?: string;           // Deployed ERC20 address on SGChain
+  tokenTxHash?: string;
+  sgchainNetworkId: string;        // e.g. "sgchain_9001-1"
+
+  // Basic metadata
+  metadata: {
+    name: string;
+    symbol: string;
+    decimals: number;              // 18 default usually
+    logoUrl?: string;
+    description?: string;
+    website?: string;
+    twitter?: string;
+    telegram?: string;
+    discord?: string;
+    otherLinks?: { label: string; url: string }[];
+  };
+
+  // Tokenomics
+  supplyConfig: {
+    totalSupply: string;            // BigInt as string
+    maxSupply?: string;            // For future if you support minting
+    isFixedSupply: boolean;        // true for now
+  };
+
+  // High-level allocation (percentages & amounts)
+  allocations: TokenAllocation[];  // See 3.2
+
+  // Release schedule / vesting config
+  vestingSchedules: VestingSchedule[]; // See 3.3
+
+  // Flags / tiers
+  features: {
+    allowAdvancedVesting: boolean;
+    allowAdditionalMint?: boolean;  // For future
+    isTradableByDefault: boolean;   // e.g. FunCoin could be "non-tradable" in UI if needed
+  };
+
+  // Admin fields (for SuperCoin especially)
+  admin: {
+    reviewedByAdminId?: string;
+    reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+    reviewNotes?: string;
+  };
+
+  // Public flags
+  isPublic: boolean;               // If visible on public API
+  isListedOnExplorer: boolean;     // For future integration
+}
+
+3.2 TokenAllocation
+
+Represents what percent of supply goes where.
+
+type TokenAllocationCategory =
+  | 'CREATOR'
+  | 'TEAM'
+  | 'TREASURY'
+  | 'COMMUNITY'
+  | 'LIQUIDITY'
+  | 'ADVISORS'
+  | 'MARKETING'
+  | 'AIRDROP'
+  | 'RESERVE'
+  | 'OTHER';
+
+TokenAllocation {
+  id: string;                      // local UUID
+  category: TokenAllocationCategory;
+  label?: string;                  // Custom label if category = OTHER
+  percent: number;                 // 0–100, sum of all = 100 (backend must validate)
+  amount: string;                  // Derived: totalSupply * percent / 100
+  targetWalletAddress?: string;    // If you know where this portion will go
+}
+
+3.3 VestingSchedule
+
+Represents release percent & timeline per allocation / wallet.
+
+type VestingType = 'IMMEDIATE' | 'CLIFF' | 'LINEAR' | 'CUSTOM';
+
+VestingSchedule {
+  id: string;
+  allocationId?: string;           // Link to TokenAllocation OR
+  beneficiaryWallet?: string;      // direct wallet beneficiary
+  vestingType: VestingType;
+
+  // What amount is governed by this vesting
+  totalAmount: string;             // must be <= allocation.amount
+
+  // Generic config
+  tgePercent: number;              // % released at TGE (Token Generation Event)
+  tgeTime: Date;                   // When token is considered "launched"
+
+  // Cliff & linear
+  cliffMonths?: number;
+  cliffTime?: Date;
+  endTime?: Date;                  // For linear vesting end time
+  linearReleaseFrequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+
+  // For CUSTOM: you can support multiple steps
+  customTranches?: {
+    unlockTime: Date;
+    percent: number;              // % of totalAmount unlocked at this time
+  }[];
+}
+
+
+This covers your “volume + release percent + timeline + number of coins” requirements. Teams can later decide what presets / constraints apply to FUN vs SUPER, but all options exist in the schema.
+
+4. Internal API Design (for Frontend & Admin)
+
+Base path example: /api/sgchain/tokens
+
+4.1 Create draft token (both Fun & Super)
+
+POST /api/sgchain/tokens
+
+Request (simplified)
+
+{
+  "tier": "FUN",
+  "creatorWalletAddress": "0x...",
+  "metadata": {
+    "name": "Team Titans Coin",
+    "symbol": "TITAN",
+    "decimals": 18,
+    "description": "Fun coin for Team Titans"
+  },
+  "supplyConfig": {
+    "totalSupply": "1000000000000000000000000",
+    "isFixedSupply": true
+  },
+  "allocations": [
+    { "category": "CREATOR", "percent": 100 }
+  ],
+  "vestingSchedules": []
+}
+
+
+Behavior
+
+Validates:
+
+sum(allocations.percent) == 100
+
+totalSupply > 0
+
+Creates TokenLaunch with status = 'DRAFT'.
+
+Returns TokenLaunch object.
+
+4.2 Update draft
+
+PUT /api/sgchain/tokens/:id
+
+Only allowed when status = 'DRAFT'.
+
+Allows updating metadata, allocations, vestingSchedules, etc.
+
+Backend must revalidate percentages and totals.
+
+4.3 Submit for on-chain creation (one-click “Create Coin”)
+
+POST /api/sgchain/tokens/:id/submit
+
+Behavior:
+
+Validate draft configuration.
+
+Change status → PENDING_ONCHAIN.
+
+Enqueue a job that:
+
+Calls sgchainClient.createToken({ tier, metadata, supplyConfig, allocations, vestingSchedules, creatorWalletAddress, backendLaunchId: id }).
+
+Waits for tx confirmation.
+
+On success:
+
+Update tokenAddress, tokenTxHash, status = 'DEPLOYED'.
+
+On failure:
+
+status = 'FAILED' and store error details.
+
+This is the core integration point with the Blockchain Team.
+
+4.4 Get token details (internal)
+
+GET /api/sgchain/tokens/:id
+
+Returns full TokenLaunch document.
+
+4.5 List all user tokens
+
+GET /api/sgchain/my-tokens
+
+Returns list of tokens where creatorUserId == currentUser.
+
+5. Public API (read-only, for future)
+
+Design now so that later you can just switch it on.
+
+Suggested endpoints under /api/public/sgchain:
+
+GET /api/public/sgchain/tokens
+
+Query params: tier, status, creator, symbol, pagination.
+
+Returns basic metadata for all isPublic = true.
+
+GET /api/public/sgchain/tokens/:address
+
+address = on-chain token address.
+
+Returns:
+
+metadata
+
+tier
+
+basic tokenomics
+
+allocations
+
+high-level vesting summary.
+
+GET /api/public/sgchain/tokens/:address/vesting
+
+Returns all VestingSchedule entries in a nice JSON.
+
+GET /api/public/sgchain/tokens/:address/allocations
+
+Returns all TokenAllocation entries.
+
+6. Integration with Blockchain Service (sgchainClient)
+
+Backend should expose a small service wrapper, e.g.:
+
+interface CreateTokenOnChainParams {
+  backendLaunchId: string;
+  tier: 'FUN' | 'SUPER';
+  creatorWalletAddress: string;
+  metadata: { name: string; symbol: string; decimals: number; };
+  supplyConfig: { totalSupply: string; isFixedSupply: boolean; };
+  allocations: TokenAllocation[];
+  vestingSchedules: VestingSchedule[];
+}
+
+interface CreateTokenOnChainResult {
+  tokenAddress: string;
+  txHash: string;
+}
+
+sgchainClient.createToken(params: CreateTokenOnChainParams): Promise<CreateTokenOnChainResult>;
+
+
+The Blockchain Team will implement the actual contract calls that match this interface (see Doc 2).
+
+7. Open Decisions (but fields present)
+
+Backend must support, even if UX later decides:
+
+Whether FUN tokens allow advanced vesting or not.
+
+Whether user can customize all allocations or only choose from presets.
+
+Whether some categories are mandatory (e.g., LIQUIDITY for SUPER).
+
+Whether FUN has a per-user limit (1–2 FunCoins max).
+
+Whether SuperCoin requires admin review/approval before deployment.
+
+All of these are future UX/business decisions.
+Data model & APIs already support them.

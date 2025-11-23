@@ -20,8 +20,13 @@ const envSchema = z.object({
   SGCHAIN_HOT_WALLET_PRIVATE_KEY: z.string().optional(),
   TEST_SGC_TARGET_ADDRESS: z.string().optional(),
   SGC_WALLET_ENCRYPTION_KEY: z.string().length(64, 'Must be a 32-byte hex key'),
+  SGC_TOKEN_CONTRACT_ADDRESS: z.string().optional(),
+  UNISWAP_V2_ROUTER_02_ADDRESS: z.string().optional(),
+  WETH_CONTRACT_ADDRESS: z.string().optional(),
+  TOKEN_FACTORY_CONTRACT_ADDRESS: z.string().optional(),
   // Sagenex to SGChain Transfers
   SGC_TRANSFER_JWT_SECRET: z.string().min(1),
   SAGENEX_INTERNAL_SECRET: z.string().min(1),
+  SGTRADING_INTERNAL_SECRET: z.string().min(1).default('default_secret_for_dev'),
 });
 export const env = envSchema.parse(process.env);

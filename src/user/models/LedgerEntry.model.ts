@@ -19,7 +19,10 @@ export interface ILedgerEntry extends Document {
     | 'SELL_SGC_DEBIT'
     | 'SELL_SGC_CREDIT'
     | 'WITHDRAWAL_REQUEST_DEBIT'
-    | 'WITHDRAWAL_REJECTED_CREDIT';
+    | 'WITHDRAWAL_REJECTED_CREDIT'
+    | 'TOKEN_DEPLOYMENT_FEE'
+    | 'TOKEN_DEPLOYMENT_REFUND'
+    | 'EXTERNAL_TRANSFER_SGC_DEBIT';
   currency: 'SGC' | 'USD';
   amount: number;
   meta: Record<string, any>;
@@ -48,6 +51,9 @@ const ledgerEntrySchema = new Schema<ILedgerEntry>(
         'SELL_SGC_CREDIT',
         'WITHDRAWAL_REQUEST_DEBIT',
         'WITHDRAWAL_REJECTED_CREDIT',
+        'TOKEN_DEPLOYMENT_FEE',
+        'TOKEN_DEPLOYMENT_REFUND',
+        'EXTERNAL_TRANSFER_SGC_DEBIT',
       ],
       required: true,
     },

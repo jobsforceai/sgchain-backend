@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import { env } from 'core/config/env';
 import { decrypt } from 'core/utils/crypto';
+import { validatePinCharacters } from 'core/utils/emoji';
 
 // --- Read Operations ---
 
@@ -38,7 +39,7 @@ export const getWalletDetails = async (userId: string) => {
 // --- PIN Management ---
 
 export const setWalletPin = async (userId: string, pin: string) => {
-  if (!/^\d{4}$/.test(pin)) {
+  if (!validatePinCharacters(pin)) {
     throw new Error('INVALID_PIN_FORMAT');
   }
   const user = await User.findById(userId);
