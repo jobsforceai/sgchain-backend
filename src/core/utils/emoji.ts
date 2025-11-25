@@ -4,40 +4,26 @@ import logger from './logger';
 
 let fullEmojiSet: string[] | null = null;
 let emojiLookupSet: Set<string> | null = null;
-
-const SPIRITUAL_SET = [
-  "🕉️", "☸️", "🛕", "🪔", "📿", "🧘", "🧿", "🪬", "🛐", "🕯️", "☯️", "✡️", "☦️", "✝️", "☪️", "🕎"
-];
-
-const MUDRA_SET = [
-  "🙏", "🤲", "👐", "🫴", "🫳", "🫱", "🫲", "✋", "🤚", "🖐", "👋", "☝️", "👆", "👇", "👈", "👉", "🫵", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "🤝", "✍️", "💪", "🤳", "🫶", "🖖", "🖕"
-];
+let categorizedEmojis: any[] | null = null;
 
 export const getEmojiSets = () => {
   if (!fullEmojiSet) {
     try {
-      const filePath = path.join(process.cwd(), 'src/core/data/emoji-test.txt');
+      const filePath = path.join(process.cwd(), 'src/core/data/categorized-emojis.json');
       const file = fs.readFileSync(filePath, 'utf8');
+      categorizedEmojis = JSON.parse(file);
+      
       const emojis: string[] = [];
-
-      const lines = file.split('\n');
-      for (const line of lines) {
-        if (!line.trim() || line.startsWith('#')) continue;
-
-        // Line format: "1F600 ; fully-qualified # 😀 grinning face"
-        const parts = line.split(';');
-        if (parts.length < 2) continue;
-
-        const codepointsPart = parts[0].trim();
-        const rest = parts[1];
-        const status = rest.split('#')[0].trim();
-
-        if (status !== 'fully-qualified') continue;
-
-        const codepoints = codepointsPart.split(' ');
-        const emojiChar = String.fromCodePoint(...codepoints.map(cp => parseInt(cp, 16)));
-        emojis.push(emojiChar);
+      if (categorizedEmojis) {
+        for (const group of categorizedEmojis) {
+          for (const category of group.categories) {
+            for (const emoji of category.emojis) {
+              emojis.push(emoji.char);
+            }
+          }
+        }
       }
+
       fullEmojiSet = emojis;
       emojiLookupSet = new Set(emojis);
       logger.info(`Loaded ${fullEmojiSet.length} emojis from file.`);
@@ -45,12 +31,12 @@ export const getEmojiSets = () => {
       logger.error('Failed to load emoji data:', error);
       fullEmojiSet = []; // Fallback to empty or handle error
       emojiLookupSet = new Set();
+      categorizedEmojis = [];
     }
   }
 
   return {
-    spiritual: SPIRITUAL_SET,
-    mudra: MUDRA_SET,
+    categorized: categorizedEmojis,
     fullSet: fullEmojiSet || []
   };
 };
