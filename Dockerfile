@@ -25,10 +25,6 @@ RUN npm install --production
 
 # Copy built files from the builder stage
 COPY --from=builder /usr/src/app/dist ./dist
-# We need tsconfig.json to support tsconfig-paths if utilized in start script, 
-# but usually 'node dist/server.js' is enough if paths are resolved or not used. 
-# However, your start script uses 'tsconfig-paths/register', so we need tsconfig.json.
-COPY tsconfig.json ./
 
 EXPOSE 3000
 
