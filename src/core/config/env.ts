@@ -17,6 +17,7 @@ const envSchema = z.object({
   JWT_SECRET_ADMIN: z.string().min(1, 'JWT_SECRET_ADMIN is required'),
   JWT_SECRET_USER: z.string().min(1, 'JWT_SECRET_USER is required'),
   SGCHAIN_RPC_URL: z.string().optional(),
+  SGCHAIN_WS_URL: z.string().optional(),
   SGCHAIN_HOT_WALLET_PRIVATE_KEY: z.string().optional(),
   TEST_SGC_TARGET_ADDRESS: z.string().optional(),
   SGC_WALLET_ENCRYPTION_KEY: z.string().length(64, 'Must be a 32-byte hex key'),
@@ -28,5 +29,13 @@ const envSchema = z.object({
   SGC_TRANSFER_JWT_SECRET: z.string().min(1),
   SAGENEX_INTERNAL_SECRET: z.string().min(1),
   SGTRADING_INTERNAL_SECRET: z.string().min(1).default('default_secret_for_dev'),
+  SGTRADING_API_URL: z.string().default('http://localhost:8080/api/v1'),
+  SGTRADING_WS_URL: z.string().default('http://localhost:8080'),
+  // Email Service (SMTP)
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  EMAIL_FROM: z.string().optional().default('no-reply@example.com'),
 });
 export const env = envSchema.parse(process.env);

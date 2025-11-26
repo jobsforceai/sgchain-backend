@@ -1,6 +1,7 @@
 // src/user/services/redeem.service.ts
 import { User } from 'user/models/User.model';
 import * as sagenexClient from 'core/clients/sagenexClient';
+import * as sgTradingClient from 'core/clients/sgTradingClient';
 import * as walletService from 'user/services/wallet.service';
 import logger from 'core/utils/logger';
 
@@ -53,5 +54,40 @@ export const redeemSagenexTransfer = async (sgcUserId: string, transferCode: str
     status: 'SUCCESS',
     creditedUsdAmount: transferredAmountUsd,
     usdBalanceAfter: wallet?.fiatBalanceUsd,
+  };
+};
+
+export const redeemSgTradingTransfer = async (sgcUserId: string, code: string) => {
+  logger.info(`[redeem-sgtrading] User ${sgcUserId} redeeming code: ${code}`);
+
+  // 1. Verify and Burn Code with SGTrading
+  const response = await sgTradingClient.verifyAndBurnCode({ code });
+  logger.info('[redeem-sgtrading] SGTrading response:', response);
+
+  if (response.status !== 'SUCCESS' || !response.amountUsd) {
+     throw new Error(response.error || 'SGTRADING_REDEEM_FAILED');
+  }
+
+  const { amountUsd, sgTradingUserId } = response;
+
+  // 2. Credit Wallet
+  await walletService.applyLedgerEntry({
+      userId: sgcUserId,
+      currency: 'USD',
+      amount: amountUsd,
+      type: 'DEPOSIT_FROM_SGTRADING_USD',
+      meta: {
+          code,
+          sgTradingUserId,
+          amountUsd
+      }
+  });
+
+  const wallet = await walletService.getWalletByUserId(sgcUserId);
+
+  return {
+      status: 'SUCCESS',
+      creditedUsdAmount: amountUsd,
+      usdBalanceAfter: wallet?.fiatBalanceUsd
   };
 };

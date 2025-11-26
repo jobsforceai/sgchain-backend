@@ -46,6 +46,7 @@ const ledgerEntrySchema = new Schema<ILedgerEntry>(
         'USER_INTERNAL_TRANSFER_CREDIT',
         'DEPOSIT_FROM_SAGENEX',
         'DEPOSIT_FROM_SAGENEX_USD',
+        'DEPOSIT_FROM_SGTRADING_USD',
         'BUY_SGC_WITH_USD_BALANCE',
         'SELL_SGC_DEBIT',
         'SELL_SGC_CREDIT',

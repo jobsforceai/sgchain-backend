@@ -5,6 +5,7 @@ import { env } from 'core/config/env';
 import logger from 'core/utils/logger';
 import { createServer } from 'http';
 import { initializeWebSocket } from 'websocket/websocket.service';
+import { connectToSgTrading } from 'market/services/sgTradingListener.service';
 
 const startServer = async () => {
   await connectDB();
@@ -14,6 +15,9 @@ const startServer = async () => {
 
   // Initialize Socket.io attached to the same HTTP server
   initializeWebSocket(httpServer);
+
+  // Connect to SGTrading (Upstream Market Data Source)
+  connectToSgTrading();
 
   httpServer.listen(env.PORT, () => {
     logger.info(`Server is running on port ${env.PORT}`);

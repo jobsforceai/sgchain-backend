@@ -33,8 +33,17 @@ export const login = async (
   next: NextFunction
 ) => {
   try {
-    const { email, otp } = req.body;
-    const result = await authService.loginUser(email, otp);
+    const { email, password, otp } = req.body;
+    let result;
+
+    if (password) {
+      result = await authService.loginWithPassword(email, password);
+    } else if (otp) {
+      result = await authService.loginWithOtp(email, otp);
+    } else {
+      throw new Error('Please provide either password or otp');
+    }
+
     res.json(result);
   } catch (error) {
     next(error);

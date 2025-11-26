@@ -24,6 +24,8 @@ router.get('/me/wallet/details', authWalletAccess, walletController.getDetails);
 
 // Redeem Sagenex Transfer
 router.post('/me/redeem-transfer', authUser, redeemController.redeemTransfer);
+// Redeem SGTrading Code (Reverse Transfer)
+router.post('/me/redeem/sgtrading', authUser, redeemController.redeemSgTrading);
 
 // Buy SGC Flow
 router.get('/buy/bank-accounts', buyController.getBankAccounts);

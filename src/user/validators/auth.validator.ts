@@ -12,5 +12,9 @@ export const requestOtpValidator = z.object({
 
 export const loginValidator = z.object({
   email: z.string().email(),
-  otp: z.string().length(6),
+  otp: z.string().length(6).optional(),
+  password: z.string().optional(),
+}).refine(data => data.password || data.otp, {
+  message: "Either password or otp must be provided",
+  path: ["password"],
 });
