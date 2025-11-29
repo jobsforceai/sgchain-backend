@@ -1,6 +1,6 @@
-import fs from 'fs';
 import path from 'path';
 import logger from './logger';
+import rawEmojiData from '../data/categorized-emojis.json';
 
 let fullEmojiSet: string[] | null = null;
 let emojiLookupSet: Set<string> | null = null;
@@ -9,9 +9,8 @@ let categorizedEmojis: any[] | null = null;
 export const getEmojiSets = () => {
   if (!fullEmojiSet) {
     try {
-      const filePath = path.join(process.cwd(), 'src/core/data/categorized-emojis.json');
-      const file = fs.readFileSync(filePath, 'utf8');
-      categorizedEmojis = JSON.parse(file);
+      // Direct import via resolveJsonModule ensures it works in dist/ too
+      categorizedEmojis = rawEmojiData as any[];
       
       const emojis: string[] = [];
       if (categorizedEmojis) {
@@ -26,7 +25,7 @@ export const getEmojiSets = () => {
 
       fullEmojiSet = emojis;
       emojiLookupSet = new Set(emojis);
-      logger.info(`Loaded ${fullEmojiSet.length} emojis from file.`);
+      logger.info(`Loaded ${fullEmojiSet.length} emojis from imported JSON data.`);
     } catch (error) {
       logger.error('Failed to load emoji data:', error);
       fullEmojiSet = []; // Fallback to empty or handle error
