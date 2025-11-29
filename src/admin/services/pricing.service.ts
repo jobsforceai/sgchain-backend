@@ -11,12 +11,16 @@ export const getCurrentPrice = async () => {
     .sort({ time: -1 });
 
   if (latestCandle) {
-    return latestCandle.close; // This is already floored by market.service
+    console.log(`[PricingService] Returning latest candle close price: ${latestCandle.close}`);
+    return latestCandle.close; 
   }
 
   // Fallback: Use config if no market data exists yet
   const priceConfig = await Config.findOne({ key: SGC_PRICE_KEY });
-  return priceConfig ? Math.floor(parseFloat(priceConfig.value)) : 0;
+  const finalPrice = priceConfig ? parseFloat(priceConfig.value) : 0;
+  
+  console.log(`[PricingService] Returning config price: ${finalPrice}`);
+  return finalPrice;
 };
 
 export const setPrice = async (

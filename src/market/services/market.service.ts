@@ -32,14 +32,16 @@ export const getCandles = async (
  * 2. Updates the current 1-minute candle in the database.
  */
 export const processPriceUpdate = async (symbol: string, price: number) => {
-  // Use whole number for simplicity as requested
-  const flooredPrice = Math.floor(price);
+  // Removed flooring to support decimal prices
+  const finalPrice = price; 
+  
+  logger.info(`[MarketService] Processing price update for ${symbol}: ${finalPrice}`);
   
   const ts = Date.now();
   const lowerSymbol = symbol.toLowerCase();
 
   // 1. Broadcast Tick
-  broadcastMarketTick(lowerSymbol, flooredPrice, ts);
+  broadcastMarketTick(lowerSymbol, finalPrice, ts);
 
   // 2. Update Candle (Resolution: 1 minute)
   // Calculate the start of the current minute (Unix timestamp in seconds)
@@ -55,9 +57,9 @@ export const processPriceUpdate = async (symbol: string, price: number) => {
 
     if (candle) {
       // Update existing candle
-      candle.close = flooredPrice;
-      if (flooredPrice > candle.high) candle.high = flooredPrice;
-      if (flooredPrice < candle.low) candle.low = flooredPrice;
+      candle.close = finalPrice;
+      if (finalPrice > candle.high) candle.high = finalPrice;
+      if (finalPrice < candle.low) candle.low = finalPrice;
       // We don't have real volume yet, so we can increment by 1 to show activity, or 0
       candle.volume += 1; 
       await candle.save();
@@ -67,10 +69,10 @@ export const processPriceUpdate = async (symbol: string, price: number) => {
         symbol: lowerSymbol,
         resolution: '1',
         time: currentMinuteTime,
-        open: flooredPrice,
-        high: flooredPrice,
-        low: flooredPrice,
-        close: flooredPrice,
+        open: finalPrice,
+        high: finalPrice,
+        low: finalPrice,
+        close: finalPrice,
         volume: 1,
       });
     }
