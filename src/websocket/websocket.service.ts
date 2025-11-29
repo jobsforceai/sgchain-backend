@@ -109,7 +109,7 @@ const connectToSgchain = () => {
         if (typeof eventData === 'object' && eventData.parentHash) {
           // It's a Block Header
           const blockNumber = parseInt(eventData.number, 16);
-          logger.info(`Received NEW_BLOCK #${blockNumber} from chain. Broadcasting to clients...`);
+          logger.debug(`Received NEW_BLOCK #${blockNumber} from chain. Broadcasting to clients...`);
           io.emit('NEW_BLOCK', eventData);
         } else if (typeof eventData === 'string') {
           // It's a Transaction Hash

@@ -35,7 +35,7 @@ export const processPriceUpdate = async (symbol: string, price: number) => {
   // Removed flooring to support decimal prices
   const finalPrice = price; 
   
-  logger.info(`[MarketService] Processing price update for ${symbol}: ${finalPrice}`);
+  logger.debug(`[MarketService] Processing price update for ${symbol}: ${finalPrice}`);
   
   const ts = Date.now();
   const lowerSymbol = symbol.toLowerCase();
