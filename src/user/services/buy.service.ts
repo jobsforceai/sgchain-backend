@@ -34,12 +34,22 @@ const FIAT_TO_USD_RATES = {
     USD: 1,
 };
 
+import { uploadToS3 } from 'core/utils/s3.helper';
+
+// ... (existing code remains the same)
+
 export const getBankAccounts = () => {
   return BANK_ACCOUNTS;
 };
 
-export const initiateBuyRequest = async (userId: string, data: any) => {
-  const { bankRegion, fiatAmount, fiatCurrency, paymentProofUrl, referenceNote } = data;
+export const initiateBuyRequest = async (userId: string, file: Express.Multer.File, data: any) => {
+  const { bankRegion, fiatAmount, fiatCurrency, referenceNote } = data;
+
+  if (!file) {
+      throw new Error('PAYMENT_PROOF_REQUIRED');
+  }
+
+  const { Location: paymentProofUrl } = await uploadToS3(file, userId);
 
   const priceUsd = await pricingService.getCurrentPrice();
   if (priceUsd <= 0) {
@@ -73,8 +83,10 @@ export const initiateBuyRequest = async (userId: string, data: any) => {
     lockedSgcAmount: request.lockedSgcAmount,
     lockedSgcPriceUsd: request.lockedSgcPriceUsd,
     lockedAt: request.lockedAt,
+    paymentProofUrl // Returning for confirmation
   };
 };
+
 
 export const getUserBuyRequests = async (userId: string, status?: string) => {
     const query: { userId: string; status?: string } = { userId };

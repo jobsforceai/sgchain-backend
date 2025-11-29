@@ -9,7 +9,8 @@ export const uploadDocument = async (
 ) => {
   try {
     const userId = (req as any).user.userId;
-    const result = await kycService.uploadKycDocument(userId, req.body);
+    // Pass the file and the body (containing region, docType)
+    const result = await kycService.uploadKycDocument(userId, req.file as Express.Multer.File, req.body);
     res.status(201).json(result);
   } catch (error) {
     next(error);

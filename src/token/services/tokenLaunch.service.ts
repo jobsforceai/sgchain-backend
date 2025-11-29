@@ -210,122 +210,205 @@ export const deployToken = async (userId: string, launchId: string) => {
 
     try {
 
-      // 2. Prepare Blockchain Params (Mapping)
-      const decimals = token.metadata.decimals;
+            // 2. Prepare Blockchain Params (Mapping)
 
-      const baseParams: sgchainClient.CreateTokenOnChainParams = {
+            const decimals = token.metadata.decimals;
 
-        backendLaunchId: toBytes32((token as any)._id.toString()),
+            const totalSupplyWei = ethers.parseUnits(token.supplyConfig.totalSupply, decimals);
 
-        tier: TIER_MAP[token.tier],
+      
 
-        creatorWalletAddress: token.creatorWalletAddress,
+            // --- DUST COLLECTION LOGIC START ---
 
-        metadata: {
+            // We must ensure that the sum of basis points is exactly 10,000 and amounts match totalSupply
 
-          name: token.metadata.name,
+            
 
-          symbol: token.metadata.symbol,
+            let allocations = token.allocations.map(a => {
 
-          decimals: decimals,
+              let beneficiaryAddress = a.targetWalletAddress || token.creatorWalletAddress;
 
-        },
+              if (token.tier === 'SUPER' && a.category === 'LIQUIDITY') {
 
-        supplyConfig: {
+                beneficiaryAddress = token.creatorWalletAddress;
 
-          totalSupply: ethers.parseUnits(token.supplyConfig.totalSupply, decimals).toString(), // Convert to Wei
+              }
 
-          isFixedSupply: token.supplyConfig.isFixedSupply,
+              return {
 
-        },
+                id: toBytes32(a.id),
 
-        allocations: token.allocations.map(a => {
+                category: CATEGORY_MAP[a.category] ?? 9,
 
-          let beneficiaryAddress = a.targetWalletAddress || token.creatorWalletAddress;
+                percent: toBasisPoints(a.percent),
 
-          if (token.tier === 'SUPER' && a.category === 'LIQUIDITY') {
+                originalPercent: a.percent,
 
-            beneficiaryAddress = ethers.ZeroAddress; // For SUPER LIQUIDITY, beneficiary is the zero address
+                amount: ethers.parseUnits(a.amount, decimals), // BigInt
 
-          }
+                beneficiary: beneficiaryAddress,
 
-          return {
+              };
 
-            id: toBytes32(a.id),
+            });
 
-            category: CATEGORY_MAP[a.category] ?? 9, // Default to OTHER if unknown
+      
 
-            percent: toBasisPoints(a.percent),
+            // Fix Basis Points Sum to 10000
 
-            amount: ethers.parseUnits(a.amount, decimals).toString(), // Convert to Wei
+            const totalBp = allocations.reduce((sum, a) => sum + a.percent, 0);
 
-            beneficiary: beneficiaryAddress,
+            const bpDiff = 10000 - totalBp;
 
-          };
+            
 
-        }),
+            if (bpDiff !== 0) {
 
-        vestingSchedules: token.vestingSchedules.map(v => {
+              // Add dust to the largest allocation to minimize impact
 
-          // Calculate timestamps
+              const largestAllocIndex = allocations.reduce((maxIdx, curr, idx, arr) => 
 
-          const tgeTime = toTimestamp(new Date(v.tgeTime));
+                curr.percent > arr[maxIdx].percent ? idx : maxIdx, 0);
 
-          const cliffTime = v.cliffMonths
+              
 
-              ? tgeTime + (v.cliffMonths * 30 * 24 * 3600)
+              allocations[largestAllocIndex].percent += bpDiff;
 
-              : tgeTime;
+              logger.info(`Adjusted allocation ${largestAllocIndex} by ${bpDiff} basis points to fix sum.`);
 
-          const endTime = v.endTime
+            }
 
-              ? toTimestamp(new Date(v.endTime))
+      
 
-              : tgeTime + (12 * 30 * 24 * 3600); // Default to 1 year if not present
+            // Fix Token Amounts Sum to Total Supply
 
-  
+            const totalAmountAllocated = allocations.reduce((sum, a) => sum + a.amount, BigInt(0));
 
-          return {
+            const amountDiff = totalSupplyWei - totalAmountAllocated;
 
-            id: toBytes32(v.id),
+      
 
-            allocationId: toBytes32(v.allocationId!),
+            if (amountDiff !== BigInt(0)) {
 
-            vestingType: VESTING_TYPE_MAP[v.vestingType],
+               const largestAllocIndex = allocations.reduce((maxIdx, curr, idx, arr) => 
 
-            totalAmount: ethers.parseUnits(v.totalAmount, decimals).toString(), // Convert to Wei
+                curr.amount > arr[maxIdx].amount ? idx : maxIdx, 0);
 
-            tgeTime: tgeTime,
+               
 
-            tgePercent: toBasisPoints(v.tgePercent),
+               allocations[largestAllocIndex].amount += amountDiff;
 
-  
+               logger.info(`Adjusted allocation ${largestAllocIndex} amount by ${amountDiff.toString()} wei to fix total supply.`);
 
-            cliffTime: cliffTime,
+            }
 
-            endTime: endTime,
+            // --- DUST COLLECTION LOGIC END ---
 
-            linearReleaseFrequency: v.linearReleaseFrequency ? FREQUENCY_MAP[v.linearReleaseFrequency] : 0,
+      
 
-  
+            const baseParams: sgchainClient.CreateTokenOnChainParams = {
 
-            customTranches: (v.customTranches || []).map(t => ({
+              backendLaunchId: toBytes32((token as any)._id.toString()),
 
-              unlockTime: toTimestamp(new Date(t.unlockTime)),
+              tier: TIER_MAP[token.tier],
 
-              percent: toBasisPoints(t.percent)
+              creatorWalletAddress: token.creatorWalletAddress,
 
-            }))
+              metadata: {
 
-          };
+                name: token.metadata.name,
 
-        }),
+                symbol: token.metadata.symbol,
 
-      };
+                decimals: decimals,
 
-  
+              },
 
-      logger.info(`Deploying token ${token.metadata.symbol} (Tier: ${token.tier}) to SGChain...`);
+              supplyConfig: {
+
+                totalSupply: totalSupplyWei.toString(),
+
+                isFixedSupply: token.supplyConfig.isFixedSupply,
+
+              },
+
+              allocations: allocations.map(a => ({
+
+                  id: a.id,
+
+                  category: a.category,
+
+                  percent: a.percent,
+
+                  amount: a.amount.toString(),
+
+                  beneficiary: a.beneficiary
+
+              })),
+
+              vestingSchedules: token.vestingSchedules.map(v => {
+
+                // Calculate timestamps
+
+                const tgeTime = toTimestamp(new Date(v.tgeTime));
+
+                const cliffTime = v.cliffMonths
+
+                    ? tgeTime + (v.cliffMonths * 30 * 24 * 3600)
+
+                    : tgeTime;
+
+                const endTime = v.endTime
+
+                    ? toTimestamp(new Date(v.endTime))
+
+                    : tgeTime + (12 * 30 * 24 * 3600); // Default to 1 year if not present
+
+      
+
+                return {
+
+                  id: toBytes32(v.id),
+
+                  allocationId: toBytes32(v.allocationId!),
+
+                  vestingType: VESTING_TYPE_MAP[v.vestingType],
+
+                  totalAmount: ethers.parseUnits(v.totalAmount, decimals).toString(), // Convert to Wei
+
+                  tgeTime: tgeTime,
+
+                  tgePercent: toBasisPoints(v.tgePercent),
+
+      
+
+                  cliffTime: cliffTime,
+
+                  endTime: endTime,
+
+                  linearReleaseFrequency: v.linearReleaseFrequency ? FREQUENCY_MAP[v.linearReleaseFrequency] : 0,
+
+      
+
+                  customTranches: (v.customTranches || []).map(t => ({
+
+                    unlockTime: toTimestamp(new Date(t.unlockTime)),
+
+                    percent: toBasisPoints(t.percent)
+
+                  }))
+
+                };
+
+              }),
+
+            };
+
+      
+
+            logger.info(`Deploying token ${token.metadata.symbol} (Tier: ${token.tier}) to SGChain...`);
+
+            logger.info('Blockchain Params:', JSON.stringify(baseParams, null, 2)); // Detailed logging
 
   
 

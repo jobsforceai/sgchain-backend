@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import * as walletController from 'user/controllers/wallet.controller';
 import * as marketController from 'user/controllers/market.controller';
 import * as buyController from 'user/controllers/buy.controller';
@@ -12,6 +13,21 @@ import { authUser } from 'core/middlewares/authUser';
 import { authWalletAccess } from 'core/middlewares/authWalletAccess';
 
 const router = Router();
+
+// Configure Multer for File Uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'application/pdf'].includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('INVALID_FILE_TYPE'));
+    }
+  },
+});
 
 // Wallet and Market Data
 router.get('/me/wallet', authUser, walletController.getMyWallet);
@@ -29,7 +45,7 @@ router.post('/me/redeem/sgtrading', authUser, redeemController.redeemSgTrading);
 
 // Buy SGC Flow
 router.get('/buy/bank-accounts', buyController.getBankAccounts);
-router.post('/me/buy-sgc', authUser, buyController.initiateBuyRequest);
+router.post('/me/buy-sgc', authUser, upload.single('paymentProof'), buyController.initiateBuyRequest);
 router.post('/me/buy-sgc/balance', authUser, buyController.buySgcWithBalance);
 router.get('/me/buy-sgc/requests', authUser, buyController.getMyBuyRequests);
 
@@ -37,7 +53,7 @@ router.get('/me/buy-sgc/requests', authUser, buyController.getMyBuyRequests);
 router.post('/me/sell-sgc', authUser, sellController.sellSgc);
 
 // KYC Flow (New Multi-Document Flow)
-router.post('/me/kyc/upload', authUser, kycController.uploadDocument);
+router.post('/me/kyc/upload', authUser, upload.single('document'), kycController.uploadDocument);
 router.post('/me/kyc/submit', authUser, kycController.submitApplication);
 router.get('/me/kyc/status', authUser, kycController.getKycStatus);
 

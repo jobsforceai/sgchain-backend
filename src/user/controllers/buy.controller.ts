@@ -22,7 +22,8 @@ export const initiateBuyRequest = async (
 ) => {
   try {
     const userId = (req as any).user.userId;
-    const result = await buyService.initiateBuyRequest(userId, req.body);
+    // Pass req.file (payment proof) along with body
+    const result = await buyService.initiateBuyRequest(userId, req.file as Express.Multer.File, req.body);
     res.status(201).json(result);
   } catch (error) {
     next(error);

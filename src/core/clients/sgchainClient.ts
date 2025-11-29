@@ -21,11 +21,11 @@ const hotWallet = new ethers.Wallet(env.SGCHAIN_HOT_WALLET_PRIVATE_KEY, provider
 const TOKEN_FACTORY_ADDRESS = env.TOKEN_FACTORY_CONTRACT_ADDRESS || "0x2BDE6AcAd0f3FD6465659ec67f80A26a2E784784";
 const UNISWAP_ROUTER_ADDRESS = env.UNISWAP_V2_ROUTER_02_ADDRESS || "0x6b1700d88f3b29e46ADF4A6810056e6C6561728e";
 const SGC_TOKEN_ADDRESS = env.SGC_TOKEN_CONTRACT_ADDRESS || "0xc9C8FfC6A16a169B17cf99f239d202475FC82f32";
+const WETH_ADDRESS = env.WETH_CONTRACT_ADDRESS;
 
 // --- Contract Instances ---
 const tokenFactoryContract = new ethers.Contract(TOKEN_FACTORY_ADDRESS, TOKEN_FACTORY_ABI, hotWallet);
-
-// ... (Keep existing code) ...
+const uniswapRouterContract = new ethers.Contract(UNISWAP_ROUTER_ADDRESS, UNISWAP_V2_ROUTER_ABI, provider);
 
 // 9. Get Swap Quote (Read-only)
 export const getSwapQuote = async (params: {
@@ -33,19 +33,19 @@ export const getSwapQuote = async (params: {
   tokenOut: string;
   amountIn: string;
 }): Promise<string> => {
-  const routerContract = new ethers.Contract(UNISWAP_ROUTER_ADDRESS, UNISWAP_V2_ROUTER_ABI, provider);
-  const WETH = await routerContract.WETH();
+  // const routerContract = new ethers.Contract(UNISWAP_ROUTER_ADDRESS, UNISWAP_V2_ROUTER_ABI, provider);
+  // const WETH = await routerContract.WETH(); // Removed, now using env.WETH_CONTRACT_ADDRESS
 
   let path: string[] = [];
-  const tokenInAddr = params.tokenIn === 'SGC' ? WETH : params.tokenIn;
-  const tokenOutAddr = params.tokenOut === 'SGC' ? WETH : params.tokenOut;
+  const tokenInAddr = params.tokenIn === 'SGC' ? WETH_ADDRESS : params.tokenIn;
+  const tokenOutAddr = params.tokenOut === 'SGC' ? WETH_ADDRESS : params.tokenOut;
 
   if (tokenInAddr.toLowerCase() === tokenOutAddr.toLowerCase()) return params.amountIn; // Same token
 
-  if (tokenInAddr.toLowerCase() === WETH.toLowerCase() || tokenOutAddr.toLowerCase() === WETH.toLowerCase()) {
+  if (tokenInAddr.toLowerCase() === WETH_ADDRESS.toLowerCase() || tokenOutAddr.toLowerCase() === WETH_ADDRESS.toLowerCase()) {
       path = [tokenInAddr, tokenOutAddr];
   } else {
-      path = [tokenInAddr, WETH, tokenOutAddr];
+      path = [tokenInAddr, WETH_ADDRESS, tokenOutAddr];
   }
 
   // Decimals
@@ -59,7 +59,7 @@ export const getSwapQuote = async (params: {
   const amountInWei = ethers.parseUnits(params.amountIn, decimalsIn);
   
   try {
-    const amounts = await routerContract.getAmountsOut(amountInWei, path);
+    const amounts = await uniswapRouterContract.getAmountsOut(amountInWei, path);
     const amountOutWei = amounts[amounts.length - 1];
     
     let decimalsOut = 18;
@@ -124,10 +124,10 @@ export const executeSwap = async (params: {
 
   // 4. Execute Swap Function
   let path: string[] = [];
-  const WETH = await routerContract.WETH();
+  // const WETH = await routerContract.WETH(); // Removed, now using env.WETH_CONTRACT_ADDRESS
 
   if (isNativeIn) {
-    path = [WETH, params.tokenOut];
+    path = [WETH_ADDRESS, params.tokenOut];
     tx = await routerContract.swapExactETHForTokens(
       amountOutMinWei,
       path,
@@ -136,7 +136,7 @@ export const executeSwap = async (params: {
       { value: amountInWei }
     );
   } else if (isNativeOut) {
-    path = [params.tokenIn, WETH];
+    path = [params.tokenIn, WETH_ADDRESS];
     tx = await routerContract.swapExactTokensForETH(
       amountInWei,
       amountOutMinWei,
@@ -145,10 +145,10 @@ export const executeSwap = async (params: {
       deadline
     );
   } else {
-    if (params.tokenIn.toLowerCase() === WETH.toLowerCase() || params.tokenOut.toLowerCase() === WETH.toLowerCase()) {
+    if (params.tokenIn.toLowerCase() === WETH_ADDRESS.toLowerCase() || params.tokenOut.toLowerCase() === WETH_ADDRESS.toLowerCase()) {
        path = [params.tokenIn, params.tokenOut];
     } else {
-       path = [params.tokenIn, WETH, params.tokenOut];
+       path = [params.tokenIn, WETH_ADDRESS, params.tokenOut];
     }
     
     tx = await routerContract.swapExactTokensForTokens(
@@ -368,7 +368,10 @@ export const createTokenWithLiquidity = async (params: CreateTokenWithLiquidityO
       allocations: params.allocations,
       vestingSchedules: params.vestingSchedules
     },
-    { value: params.sgcAmountForLiquidity } // Send native SGC as value
+    { 
+      value: params.sgcAmountForLiquidity,
+      gasLimit: 5000000 // Manual gas limit to bypass estimation failure
+    } 
   );
   
   const receipt = await txResponse.wait();

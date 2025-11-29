@@ -22,9 +22,9 @@ const envSchema = z.object({
   TEST_SGC_TARGET_ADDRESS: z.string().optional(),
   SGC_WALLET_ENCRYPTION_KEY: z.string().length(64, 'Must be a 32-byte hex key'),
   SGC_TOKEN_CONTRACT_ADDRESS: z.string().optional(),
-  UNISWAP_V2_ROUTER_02_ADDRESS: z.string().optional(),
-  WETH_CONTRACT_ADDRESS: z.string().optional(),
-  TOKEN_FACTORY_CONTRACT_ADDRESS: z.string().optional(),
+  UNISWAP_V2_ROUTER_02_ADDRESS: z.string().min(1, 'UNISWAP_V2_ROUTER_02_ADDRESS is required'),
+  WETH_CONTRACT_ADDRESS: z.string().min(1, 'WETH_CONTRACT_ADDRESS is required'),
+  TOKEN_FACTORY_CONTRACT_ADDRESS: z.string().min(1, 'TOKEN_FACTORY_CONTRACT_ADDRESS is required'),
   // Sagenex to SGChain Transfers
   SGC_TRANSFER_JWT_SECRET: z.string().min(1),
   SAGENEX_INTERNAL_SECRET: z.string().min(1),
@@ -37,5 +37,11 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().optional().default('no-reply@example.com'),
+  
+  // AWS S3 (KYC Uploads)
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_REGION: z.string().optional(),
+  S3_BUCKET_NAME: z.string().optional(),
 });
 export const env = envSchema.parse(process.env);
